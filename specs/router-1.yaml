@@ -1,0 +1,28 @@
+# mini-vps-platform 用 VM spec。
+# `uv run mini-vps create specs/router-1.yaml` で作成する。
+#
+# base_image は build/build-golden-image.sh の出力ファイル名に置き換えること
+# (ビルドのたびにファイル名の日付部分が変わるため)。
+name: router-1
+memory: 1024
+vcpus: 2
+base_image: minivps-router-golden-YYYYMMDD.qcow2
+disk: 10
+hostname: router-1
+networks:
+  # 1件目 = 管理NIC。あえてDHCPの文字列指定ではなく静的IPにする。
+  # 理由: mini_vps/manager.py の _static_ipv4() は networks の先頭から走査して
+  # 最初に見つかった静的NICのIPを `mini-vps status`/`get` に返す。管理NICを
+  # 先頭かつ静的にすることで、複数の固定IPを持つこのVMでも
+  # 「mini-vps status router-1」がSSH到達可能な管理IPを返す。
+  - name: default
+    address: 192.168.122.10/24
+    gateway: 192.168.122.1   # このVM唯一のデフォルトルート(他NICにはgatewayを設定しない)
+  - name: seg1
+    address: 192.168.201.10/24   # gatewayなし(直接接続ルートで到達性は足りる)
+  - name: seg2
+    address: 192.168.202.10/24
+  - name: seg3
+    address: 192.168.203.10/24
+# filtersは未設定(デフォルトnull=libvirt側の追加inbound制限なし)。
+# 受信保護はゴールデンイメージに焼き込んだゲスト内nftables(input chain)が担う。
