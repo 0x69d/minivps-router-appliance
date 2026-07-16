@@ -143,6 +143,8 @@ virsh vol-create "$SEEDS_POOL" "$WORKDIR/seed-vol.xml"
 virsh vol-upload --pool "$SEEDS_POOL" --vol "$TEMP_SEED_VOL" --file "$WORKDIR/seed.iso" --sparse
 
 echo "==> ビルドVMを起動(transient): $BUILD_VM_NAME"
+TEMP_DISK_PATH="$(virsh vol-path --pool "$IMAGES_POOL" "$TEMP_DISK_VOL")"
+TEMP_SEED_PATH="$(virsh vol-path --pool "$SEEDS_POOL" "$TEMP_SEED_VOL")"
 cat > "$WORKDIR/domain.xml" <<EOF
 <domain type='kvm'>
   <name>$BUILD_VM_NAME</name>
@@ -158,14 +160,14 @@ cat > "$WORKDIR/domain.xml" <<EOF
   <clock offset='utc'/>
   <on_poweroff>destroy</on_poweroff>
   <devices>
-    <disk type='volume' device='disk'>
+    <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' discard='unmap'/>
-      <source pool='$IMAGES_POOL' volume='$TEMP_DISK_VOL'/>
+      <source file='$TEMP_DISK_PATH'/>
       <target dev='vda' bus='virtio'/>
     </disk>
-    <disk type='volume' device='cdrom'>
+    <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source pool='$SEEDS_POOL' volume='$TEMP_SEED_VOL'/>
+      <source file='$TEMP_SEED_PATH'/>
       <target dev='sda' bus='sata'/>
       <readonly/>
     </disk>

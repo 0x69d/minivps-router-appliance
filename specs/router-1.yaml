@@ -6,7 +6,7 @@
 name: router-1
 memory: 1024
 vcpus: 2
-base_image: minivps-router-golden-YYYYMMDD.qcow2
+base_image: minivps-router-golden-20260716.qcow2
 disk: 10
 hostname: router-1
 networks:
