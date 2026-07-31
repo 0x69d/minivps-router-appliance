@@ -3,22 +3,16 @@
 #
 # ベースのUbuntu cloud imageに nftables + 本リポジトリのゲスト内設定
 # (image/etc/**)を焼き込み、libvirtの`images`ストレージプールへ
-# 新しいボリュームとして配置する。手法は「一時VMをcloud-initでカスタマイズ
-# して起動し、シャットダウン後のディスクをそのままゴールデンイメージとして
-# 確定する」方式(libguestfs系ツールがこの環境に無いため、cloud-init +
-# virsh/cloud-localds という既存ツールだけで完結させる)。
+# 新しいボリュームとして配置する。一時VMをcloud-initでカスタマイズして
+# 起動し、シャットダウン後のディスクをそのままゴールデンイメージとして
+# 確定する方式。
 #
 # ディスク/seed ISOの扱いは、mini-vps-platform自身が
 # create_overlay_volume()/build_seed_iso()(mini_vps/resources.py)で
 # 使っているのと同じlibvirt volume APIに揃えている:
-#   - ビルド用ディスクは`images`プール内で`vol-clone`(同一プール内の完全コピー、
-#     backing storeなし)して作る。qemu-img/生ファイルのパス指定は使わない。
+#   - ビルド用ディスクは`images`プール内で`vol-clone`して作る。
 #   - seed ISOはmini-vps-platformが使うのと同じ`vps-seeds`プールに
 #     vol-create+vol-uploadで配置する。
-# pool管理下のvolumeは、`images`/`vps-pool`が root:root 0711 であっても
-# 実際のVMが問題なく起動できているのと同じ理由(libvirt自身がドメイン起動時に
-# QEMUから見た所有権/アクセスを解決する)でQEMUから直接アクセスできる。
-# sudoもsecurity_driver設定変更も、ホスト固有のグループ構成への依存も不要。
 #
 # 出力: `images`プール内に <GOLDEN_IMAGE_NAME> という名前のボリュームとして配置。
 # specs/router-1.yaml の base_image をこの名前に書き換えて使う。
@@ -35,22 +29,20 @@ SEEDS_POOL="${SEEDS_POOL:-vps-seeds}"
 WAIT_TIMEOUT_SEC="${WAIT_TIMEOUT_SEC:-600}"
 
 # ビルド中だけ使う固定名の一時volume。成功時のみ最後にGOLDEN_IMAGE_NAMEへ
-# vol-cloneで「確定」させる(失敗時にGOLDEN_IMAGE_NAME名の不完全な
-# volumeが残ることを防ぐため、確定前は常にこの一時名で扱う)。
+# vol-cloneで確定させる。失敗時にGOLDEN_IMAGE_NAME名の不完全な
+# volumeが残ることを防ぐため。
 TEMP_DISK_VOL="minivps-router-build-disk.qcow2"
 TEMP_SEED_VOL="minivps-router-build-seed.iso"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# ローカル一時ディレクトリはQEMUには一切見せない(seed ISO生成専用の
-# 自プロセス専有ワークスペース)。mktemp -d既定の0700のままでよい。
 WORKDIR="$(mktemp -d /var/tmp/minivps-router-build.XXXXXX)"
 
 cleanup() {
-  # transientドメインはpoweroffで即座にdestroy&削除される(shut offを経由しない)ため、
+  # transientドメインはpoweroffで即座にdestroy&削除されるため、
   # 保険としての destroy/undefine はベストエフォートで構わない。
   virsh destroy "$BUILD_VM_NAME" >/dev/null 2>&1 || true
   virsh undefine "$BUILD_VM_NAME" --nvram >/dev/null 2>&1 || true
-  # 一時volumeは常に破棄する(成功時はGOLDEN_IMAGE_NAMEへ確定済みなので不要になる)。
+  # 一時volumeは常に破棄する。
   virsh vol-delete --pool "$IMAGES_POOL" "$TEMP_DISK_VOL" >/dev/null 2>&1 || true
   virsh vol-delete --pool "$SEEDS_POOL" "$TEMP_SEED_VOL" >/dev/null 2>&1 || true
   rm -rf "$WORKDIR"
@@ -66,7 +58,7 @@ virsh pool-info "$SEEDS_POOL" >/dev/null
 virsh net-info default >/dev/null
 [ -r "$SSH_PUBKEY_PATH" ] || { echo "pubkey not found: $SSH_PUBKEY_PATH" >&2; exit 1; }
 
-# 前回異常終了時の残骸があれば削除(固定名のため再実行時に衝突しうる)。
+# 前回異常終了時の残骸があれば削除。
 virsh vol-delete --pool "$IMAGES_POOL" "$TEMP_DISK_VOL" >/dev/null 2>&1 || true
 virsh vol-delete --pool "$SEEDS_POOL" "$TEMP_SEED_VOL" >/dev/null 2>&1 || true
 
@@ -117,10 +109,10 @@ write_files:
       cloud-init clean --logs --machine-id || cloud-init clean --logs
       truncate -s 0 /etc/machine-id
       rm -f /root/golden-finalize.sh
-      # poweroffは必ずこの関数の最後の行にする(cloud-init cleanで状態を消した後に
+      # poweroffは必ずこの関数の最後の行にする。cloud-init cleanで状態を消した後に
       # power_state: モジュール等の後続処理を動かすと、消した状態を前提にした
       # 処理が失敗しシャットダウンがスケジュールされないことがあるため、
-      # power_state: ディレクティブは使わずここで直接・最後に呼ぶ)。
+      # power_state: ディレクティブは使わずここで直接呼ぶ。
       systemctl poweroff --no-block
 runcmd:
   - /root/golden-finalize.sh
@@ -183,10 +175,9 @@ EOF
 
 virsh create "$WORKDIR/domain.xml"
 
-echo "==> cloud-init完了(ゲストのpoweroffでtransientドメインが消滅する)を待機(最大${WAIT_TIMEOUT_SEC}秒)"
+echo "==> cloud-init完了を待機(最大${WAIT_TIMEOUT_SEC}秒)"
 # on_poweroff=destroy のtransientドメインは、poweroff発生時に「shut off」状態を
-# 経由せず即座にlibvirtのドメイン一覧から消える。「shut off」を待つ実装は
-# 誤り(ゲストが実際には完了していても検知できずタイムアウトする)。
+# 経由せず即座にlibvirtのドメイン一覧から消える。
 elapsed=0
 while virsh domstate "$BUILD_VM_NAME" >/dev/null 2>&1; do
   sleep 5
