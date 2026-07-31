@@ -10,7 +10,7 @@ base_image: minivps-router-golden-20260716.qcow2
 disk: 10
 hostname: router-1
 networks:
-  # 1件目 = 管理NIC。あえてDHCPの文字列指定ではなく静的IPにする。
+  # 1件目 = 管理NIC。DHCPの文字列指定ではなく静的IPにする。
   # 理由: mini_vps/manager.py の _static_ipv4() は networks の先頭から走査して
   # 最初に見つかった静的NICのIPを `mini-vps status`/`get` に返す。管理NICを
   # 先頭かつ静的にすることで、複数の固定IPを持つこのVMでも
@@ -19,7 +19,7 @@ networks:
     address: 192.168.122.10/24
     gateway: 192.168.122.1   # このVM唯一のデフォルトルート(他NICにはgatewayを設定しない)
   - name: seg1
-    address: 192.168.201.10/24   # gatewayなし(直接接続ルートで到達性は足りる)
+    address: 192.168.201.10/24
   - name: seg2
     address: 192.168.202.10/24
   - name: seg3
