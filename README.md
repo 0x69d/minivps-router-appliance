@@ -89,7 +89,12 @@ static_routes:
 
 これだけでは経路が通っても、router-1側の許可リストにルールを追加しない限りforward chainの既定拒否で通信が止まる点に注意。
 
+## tests
+
+- `tests/lint-nftables.sh` — nftables.confの構文チェック。`/etc/nftables.d`のincludeパスを本リポジトリ内へ差し替えて`nft -c`にかけるため、`90-segment-allow.conf`も併せて検証される(要`nft`・CAP_NET_ADMIN。sudoで実行する)。
+
 ## トラブルシューティング
 
-- ビルドがタイムアウトした場合: `virsh console <ビルドVM名>` でシリアルコンソールに接続して調査する。ビルド用ドメインはtransientで、シャットダウンと同時に消滅する点に注意。
+- ビルドがタイムアウトした場合: 調査のためビルドVMとそのディスクは意図的に残される。表示されるSSH手順で `cloud-init status --long` と `/var/log/cloud-init-output.log` を確認する。cloud-initの初期段階で止まっているとSSHは通らないため、その場合は `virsh console <ビルドVM名>` でシリアルコンソールから調査する。調査後は `virsh destroy <ビルドVM名>` で破棄すれば、残骸は次回実行の冒頭掃除が回収する。
 - `mini-vps status`が管理IP以外を返す場合: `specs/router-1.yaml`の`networks`の並び順(`default`が先頭かつ静的IPになっているか)を確認する。
+- DHCPレンジとの重複: 192.168.122.10/192.168.201.10/192.168.202.10/192.168.203.10はいずれもlibvirt DHCPレンジ(.2〜.254)内にある。router-1は常時起動の運用を前提とし、長期停止させる場合は同アドレスのDHCP払い出しと衝突しうる点に注意する。
