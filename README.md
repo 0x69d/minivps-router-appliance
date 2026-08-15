@@ -11,6 +11,7 @@ mini-vps-platformの`seg1`〜`seg3`(192.168.201〜203.0/24)は、それぞれ独
 ## 前提条件
 
 - mini-vps-platformがセットアップ済み(`~/.ssh/minivps_ed25519.pub`公開鍵、`seg1`〜`seg3`ネットワーク、`images`ストレージプール、`ubuntu-26.04.img`が`images`プールに存在すること)
+- セグメントは mini-vps-platform の既定では作られない。`ansible/vars/network_segments.yml` で定義して playbook を実行する(同ファイルに3セグメント構成の例をコメントで同梱)。
 
 ## アーキテクチャ
 
